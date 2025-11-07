@@ -1,7 +1,12 @@
 {
-  "name": "node-starter",
+  "name": "learn2teach",
+  "version": "1.0.0",
+  "description": "A modern skill-sharing platform that connects teachers and learners",
   "private": true,
+  "keywords": ["skills", "learning", "teaching", "platform"],
+  "author": "Ibrahim Laskar",
+  "license": "MIT",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"No tests defined yet\""
   }
 }
