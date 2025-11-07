@@ -6,8 +6,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 app = Flask(__name__)
-app.config["SECRET_KEY"] = "learn2teach-dev-secret"
+app.config["SECRET_KEY"] = os.getenv("FLASK_SECRET_KEY", "learn2teach-dev-secret")
 app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SECURE"] = os.getenv("FLASK_ENV") == "production"
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=7)
 
 users_db = {}
@@ -208,5 +210,8 @@ def not_found(error):
     return render_template("index.html"), 404
 
 if __name__ == "__main__":
-    print(" Learn2Teach running on http://127.0.0.1:5000")
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    is_production = os.getenv("FLASK_ENV") == "production"
+    debug_mode = not is_production
+    print(f"✓ Learn2Teach running on http://127.0.0.1:5000")
+    print(f"✓ Environment: {'Production' if is_production else 'Development'}")
+    app.run(debug=debug_mode, host="0.0.0.0", port=int(os.getenv("PORT", 5000)))
