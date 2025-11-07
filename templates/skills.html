@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Browse Skills - Learn2Teach</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <header>
+        <nav class="container">
+            <a href="/" class="logo">Learn2Teach</a>
+            <ul class="nav-links">
+                <li><a href="/dashboard">Dashboard</a></li>
+                <li><a href="/skills">Browse Skills</a></li>
+                <li><a href="/profile">Profile</a></li>
+                <li><button onclick="logout()" class="btn btn-secondary">Logout</button></li>
+            </ul>
+        </nav>
+    </header>
+
+    <div class="dashboard">
+        <div class="container">
+            <h1>Browse Skills</h1>
+
+            <div class="filter-bar">
+                <div class="filter-row">
+                    <div class="form-group">
+                        <label>Skill Type</label>
+                        <select id="filter-type" onchange="filterSkills()">
+                            <option value="">All</option>
+                            <option value="teaching">Teaching</option>
+                            <option value="learning">Learning</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Category</label>
+                        <select id="filter-category" onchange="filterSkills()">
+                            <option value="">All Categories</option>
+                            <option value="Programming">Programming</option>
+                            <option value="Languages">Languages</option>
+                            <option value="Arts & Design">Arts & Design</option>
+                            <option value="Music">Music</option>
+                            <option value="Business">Business</option>
+                            <option value="Fitness">Fitness</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Location</label>
+                        <input type="text" id="filter-location" placeholder="Search by location" onkeyup="filterSkills()">
+                    </div>
+                </div>
+            </div>
+
+            <div id="alert-container"></div>
+
+            <div class="skills-grid" id="skills-list">
+                <div class="empty-state">
+                    <h3>Loading skills...</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="book-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Book Session</h2>
+                <button class="modal-close" onclick="closeBookModal()">&times;</button>
+            </div>
+            <form id="book-form">
+                <input type="hidden" id="book_teacher_id">
+                <input type="hidden" id="book_skill_id">
+                <input type="hidden" id="book_hourly_rate">
+                <input type="hidden" id="book_accepts_exchange">
+
+                <div id="skill-details" style="margin-bottom: 24px; padding: 16px; background: var(--bg-light); border-radius: 6px;"></div>
+
+                <div class="form-group">
+                    <label for="session_date">Session Date & Time</label>
+                    <input type="datetime-local" id="session_date" required>
+                </div>
+                <div class="form-group">
+                    <label for="duration_hours">Duration (hours)</label>
+                    <input type="number" id="duration_hours" min="0.5" step="0.5" value="1" required onchange="updateTotal()">
+                </div>
+                <div class="form-group">
+                    <label for="location">Location</label>
+                    <input type="text" id="location" value="online" required>
+                </div>
+                <div class="form-group">
+                    <label for="payment_type">Payment Method</label>
+                    <select id="payment_type" required onchange="toggleExchangeField()">
+                        <option value="paid">Pay with Money</option>
+                        <option value="exchange" id="exchange-option">Skill Exchange</option>
+                    </select>
+                </div>
+                <div id="exchange-field" class="form-group" style="display: none;">
+                    <label for="exchange_skill_id">Select Your Skill to Exchange</label>
+                    <select id="exchange_skill_id"></select>
+                </div>
+                <div class="form-group">
+                    <label for="notes">Additional Notes</label>
+                    <textarea id="notes"></textarea>
+                </div>
+                <div id="total-amount" style="margin: 16px 0; padding: 16px; background: var(--bg-light); border-radius: 6px; font-size: 18px; font-weight: 600;">
+                    Total: $0.00
+                </div>
+                <button type="submit" class="btn btn-primary">Book Session</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let currentSkill = null;
+        let mySkillsForExchange = [];
+
+        async function logout() {
+            try {
+                await fetch('/api/auth/logout', { method: 'POST' });
+                window.location.href = '/';
+            } catch (error) {
+                console.error('Logout failed:', error);
+            }
+        }
+
+        async function filterSkills() {
+            const type = document.getElementById('filter-type').value;
+            const category = document.getElementById('filter-category').value;
+            const location = document.getElementById('filter-location').value;
+
+            let url = '/api/skills?';
+            if (type) url += `type=${type}&`;
+            if (category) url += `category=${category}&`;
+            if (location) url += `location=${location}&`;
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data.success) {
+                    displaySkills(data.skills);
+                }
+            } catch (error) {
+                console.error('Failed to load skills:', error);
+            }
+        }
+
+        function displaySkills(skills) {
+            const skillsList = document.getElementById('skills-list');
+
+            if (skills.length === 0) {
+                skillsList.innerHTML = '<div class="empty-state"><h3>No skills found</h3><p>Try adjusting your filters</p></div>';
+                return;
+            }
+
+            skillsList.innerHTML = skills.map(skill => {
+                const userInitial = skill.profiles.full_name.charAt(0).toUpperCase();
+                return `
+                    <div class="skill-card">
+                        <div class="skill-header">
+                            <div class="skill-avatar">${userInitial}</div>
+                            <div class="skill-info">
+                                <h3>${skill.profiles.full_name}</h3>
+                                <p>${skill.profiles.location || 'Location not specified'}</p>
+                            </div>
+                        </div>
+                        <span class="skill-badge badge-${skill.skill_type}">${skill.skill_type}</span>
+                        <h3>${skill.skill_name}</h3>
+                        <p class="skill-location">${skill.category}</p>
+                        <p class="skill-description">${skill.description}</p>
+                        <div class="skill-footer">
+                            <div class="skill-price">
+                                ${skill.hourly_rate > 0 ? '$' + skill.hourly_rate + '/hr' : 'Free'}
+                                ${skill.accepts_exchange ? ' or Exchange' : ''}
+                            </div>
+                            ${skill.skill_type === 'teaching' ?
+                                `<button class="btn btn-primary" onclick='openBookModal(${JSON.stringify(skill)})'>Book</button>`
+                                : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function loadMySkillsForExchange() {
+            try {
+                const response = await fetch('/api/skills?type=teaching');
+                const data = await response.json();
+                if (data.success) {
+                    mySkillsForExchange = data.skills;
+                }
+            } catch (error) {
+                console.error('Failed to load my skills:', error);
+            }
+        }
+
+        function openBookModal(skill) {
+            currentSkill = skill;
+            document.getElementById('book_teacher_id').value = skill.user_id;
+            document.getElementById('book_skill_id').value = skill.id;
+            document.getElementById('book_hourly_rate').value = skill.hourly_rate;
+            document.getElementById('book_accepts_exchange').value = skill.accepts_exchange;
+
+            document.getElementById('skill-details').innerHTML = `
+                <strong>Skill:</strong> ${skill.skill_name}<br>
+                <strong>Category:</strong> ${skill.category}<br>
+                <strong>Teacher:</strong> ${skill.profiles.full_name}<br>
+                <strong>Rate:</strong> ${skill.hourly_rate > 0 ? '$' + skill.hourly_rate + '/hr' : 'Free'}
+                ${skill.accepts_exchange ? '<br><strong>Accepts skill exchange</strong>' : ''}
+            `;
+
+            if (!skill.accepts_exchange) {
+                document.getElementById('exchange-option').style.display = 'none';
+                document.getElementById('payment_type').value = 'paid';
+            } else {
+                document.getElementById('exchange-option').style.display = 'block';
+            }
+
+            updateTotal();
+            document.getElementById('book-modal').classList.add('active');
+        }
+
+        function closeBookModal() {
+            document.getElementById('book-modal').classList.remove('active');
+            document.getElementById('book-form').reset();
+        }
+
+        function toggleExchangeField() {
+            const paymentType = document.getElementById('payment_type').value;
+            const exchangeField = document.getElementById('exchange-field');
+
+            if (paymentType === 'exchange') {
+                exchangeField.style.display = 'block';
+                const exchangeSelect = document.getElementById('exchange_skill_id');
+                exchangeSelect.innerHTML = mySkillsForExchange.map(skill =>
+                    `<option value="${skill.id}">${skill.skill_name} - ${skill.category}</option>`
+                ).join('');
+            } else {
+                exchangeField.style.display = 'none';
+            }
+
+            updateTotal();
+        }
+
+        function updateTotal() {
+            const duration = parseFloat(document.getElementById('duration_hours').value) || 0;
+            const hourlyRate = parseFloat(document.getElementById('book_hourly_rate').value) || 0;
+            const paymentType = document.getElementById('payment_type').value;
+
+            const total = paymentType === 'paid' ? duration * hourlyRate : 0;
+            document.getElementById('total-amount').textContent =
+                paymentType === 'exchange' ? 'Payment: Skill Exchange' : `Total: $${total.toFixed(2)}`;
+        }
+
+        document.getElementById('book-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const bookingData = {
+                teacher_id: document.getElementById('book_teacher_id').value,
+                skill_id: document.getElementById('book_skill_id').value,
+                session_date: document.getElementById('session_date').value,
+                duration_hours: parseFloat(document.getElementById('duration_hours').value),
+                location: document.getElementById('location').value,
+                payment_type: document.getElementById('payment_type').value,
+                notes: document.getElementById('notes').value
+            };
+
+            if (bookingData.payment_type === 'paid') {
+                const hourlyRate = parseFloat(document.getElementById('book_hourly_rate').value);
+                bookingData.total_amount = bookingData.duration_hours * hourlyRate;
+            } else {
+                bookingData.total_amount = 0;
+                bookingData.exchange_skill_id = document.getElementById('exchange_skill_id').value;
+            }
+
+            try {
+                const response = await fetch('/api/sessions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(bookingData)
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    closeBookModal();
+                    showAlert('Session booked successfully!', 'success');
+                } else {
+                    showAlert(data.message, 'error');
+                }
+            } catch (error) {
+                showAlert('Failed to book session', 'error');
+            }
+        });
+
+        function showAlert(message, type) {
+            const alertContainer = document.getElementById('alert-container');
+            alertContainer.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+            setTimeout(() => {
+                alertContainer.innerHTML = '';
+            }, 3000);
+        }
+
+        loadMySkillsForExchange();
+        filterSkills();
+    </script>
+</body>
+</html>

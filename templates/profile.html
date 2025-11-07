@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile - Learn2Teach</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <header>
+        <nav class="container">
+            <a href="/" class="logo">Learn2Teach</a>
+            <ul class="nav-links">
+                <li><a href="/dashboard">Dashboard</a></li>
+                <li><a href="/skills">Browse Skills</a></li>
+                <li><a href="/profile">Profile</a></li>
+                <li><button onclick="logout()" class="btn btn-secondary">Logout</button></li>
+            </ul>
+        </nav>
+    </header>
+
+    <div class="dashboard">
+        <div class="container">
+            <div class="dashboard-header">
+                <h1>My Profile</h1>
+            </div>
+
+            <div id="alert-container"></div>
+
+            <div style="max-width: 600px; margin: 0 auto;">
+                <div style="background: white; padding: 32px; border-radius: 8px; box-shadow: var(--shadow);">
+                    <form id="profile-form">
+                        <div class="form-group">
+                            <label for="full_name">Full Name</label>
+                            <input type="text" id="full_name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="bio">Bio</label>
+                            <textarea id="bio" placeholder="Tell others about yourself..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="location">Location</label>
+                            <input type="text" id="location" placeholder="City, State">
+                        </div>
+                        <div class="form-group">
+                            <label for="profile_image">Profile Image URL</label>
+                            <input type="url" id="profile_image" placeholder="https://example.com/image.jpg">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Update Profile</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function logout() {
+            try {
+                await fetch('/api/auth/logout', { method: 'POST' });
+                window.location.href = '/';
+            } catch (error) {
+                console.error('Logout failed:', error);
+            }
+        }
+
+        async function loadProfile() {
+            try {
+                const response = await fetch('/api/profile');
+                const data = await response.json();
+
+                if (data.success) {
+                    document.getElementById('full_name').value = data.profile.full_name || '';
+                    document.getElementById('bio').value = data.profile.bio || '';
+                    document.getElementById('location').value = data.profile.location || '';
+                    document.getElementById('profile_image').value = data.profile.profile_image || '';
+                }
+            } catch (error) {
+                console.error('Failed to load profile:', error);
+            }
+        }
+
+        document.getElementById('profile-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const profileData = {
+                full_name: document.getElementById('full_name').value,
+                bio: document.getElementById('bio').value,
+                location: document.getElementById('location').value,
+                profile_image: document.getElementById('profile_image').value
+            };
+
+            try {
+                const response = await fetch('/api/profile', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(profileData)
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showAlert('Profile updated successfully!', 'success');
+                } else {
+                    showAlert(data.message, 'error');
+                }
+            } catch (error) {
+                showAlert('Failed to update profile', 'error');
+            }
+        });
+
+        function showAlert(message, type) {
+            const alertContainer = document.getElementById('alert-container');
+            alertContainer.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+            setTimeout(() => {
+                alertContainer.innerHTML = '';
+            }, 3000);
+        }
+
+        loadProfile();
+    </script>
+</body>
+</html>
